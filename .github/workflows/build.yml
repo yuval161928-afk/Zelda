@@ -424,6 +424,27 @@ jobs:
           echo "DM_GAME=$PROFILE_ID" >> "$GITHUB_ENV"
           echo "DETECTED_TITLE_ID=${DETECTED_ID}" >> "$GITHUB_ENV"
 
+      - name: Restore title IDs in package filenames
+        shell: bash
+        run: |
+          set -euo pipefail
+          GAME_DIR="$RUNNER_TEMP/GameFiles"
+          UPDATE_ID="$(printf '%016X' $(( 0x$DM_GAME + 0x800 )))"
+
+          # Direct (non-RAR) downloads are saved as game.nsp / update.nsp,
+          # which loses the title ID that build_ipa_from_nsp.py searches for.
+          for ext in nsp xci nsz xcz; do
+            if [[ -f "$GAME_DIR/game.$ext" ]]; then
+              mv "$GAME_DIR/game.$ext" "$GAME_DIR/Game [$DM_GAME][v0].$ext"
+            fi
+            if [[ -f "$GAME_DIR/update.$ext" ]]; then
+              mv "$GAME_DIR/update.$ext" "$GAME_DIR/Update [$UPDATE_ID][v1].$ext"
+            fi
+          done
+
+          echo "=== Package files ==="
+          ls -l "$GAME_DIR"
+
       - name: Update shader toolchain lock and header
         shell: bash
         run: |
