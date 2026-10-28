@@ -1,4 +1,3 @@
-
 name: NxNative - Generic IPA Builder
 
 on:
@@ -13,10 +12,10 @@ on:
           - "iPhone 15 or older (BC fallback)"
           - "iPhone 15 Pro/Pro Max or newer (standard)"
       profile_id:
-        description: "Optional nxnative profile ID override (leave blank for automatic detection)"
+        description: "nxnative profile ID (16 hex chars). Used when auto-detection fails."
         required: false
         type: string
-        default: ""
+        default: "0100F2C0115B6000"
 
 permissions:
   contents: read
@@ -400,20 +399,24 @@ jobs:
 
           print(next(iter(candidates)))
           PY
-          )"
+          )" || DETECTED_ID=""
+
+          if [[ -z "$DETECTED_ID" ]]; then
+            echo "::warning::Title ID auto-detection failed; falling back to the profile_id input."
+          fi
 
           PROFILE_ID="${PROFILE_OVERRIDE:-$DETECTED_ID}"
           PROFILE_ID="$(echo "$PROFILE_ID" | tr '[:lower:]' '[:upper:]')"
 
           if [[ ! "$PROFILE_ID" =~ ^[0-9A-F]{16}$ ]]; then
-            echo "::error::Profile ID must be exactly 16 hexadecimal characters."
+            echo "::error::Profile ID must be exactly 16 hexadecimal characters (auto-detection failed and no valid profile_id was given)."
             exit 1
           fi
 
-          echo "Detected base title ID: $DETECTED_ID"
+          echo "Detected base title ID: ${DETECTED_ID:-none}"
           echo "Shader profile ID: $PROFILE_ID"
           echo "DM_GAME=$PROFILE_ID" >> "$GITHUB_ENV"
-          echo "DETECTED_TITLE_ID=$DETECTED_ID" >> "$GITHUB_ENV"
+          echo "DETECTED_TITLE_ID=${DETECTED_ID:-$PROFILE_ID}" >> "$GITHUB_ENV"
 
       - name: Update shader toolchain lock and header
         shell: bash
