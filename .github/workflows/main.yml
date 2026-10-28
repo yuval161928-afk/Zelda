@@ -184,7 +184,7 @@ jobs:
                   )
 
           def add_package(source, label):
-              target = game_dir / source.name
+              target = game_dir / f"{label}__{source.name}"
 
               if target.exists():
                   raise SystemExit(
@@ -426,14 +426,40 @@ jobs:
           BASE_ID="${DETECTED_TITLE_ID:-$DM_GAME}"
 
           shopt -s nullglob
-          for f in "$GAME_DIR"/game.*; do
-            ext="${f##*.}"
-            new="$GAME_DIR/Game [${BASE_ID}][v0].${ext}"
-            mv -v "$f" "$new"
-          done
+          BASE_FILES=("$GAME_DIR"/game.* "$GAME_DIR"/game__*)
+
+          if [[ ${#BASE_FILES[@]} -ne 1 ]]; then
+            echo "::error::Expected exactly one base game package, found ${#BASE_FILES[@]}: ${BASE_FILES[*]:-none}"
+            ls -la "$GAME_DIR"
+            exit 1
+          fi
+
+          f="${BASE_FILES[0]}"
+          ext="${f##*.}"
+          new="$GAME_DIR/Game [${BASE_ID}][v0].${ext}"
+          mv -v "$f" "$new"
 
           echo "=== Packages in $GAME_DIR ==="
           ls -la "$GAME_DIR"
+
+          echo "=== Files inside the base package (diagnostic) ==="
+          python - "$new" <<'PY'
+          import struct
+          import sys
+
+          with open(sys.argv[1], "rb") as f:
+              header = f.read(16)
+              if header[:4] != b"PFS0":
+                  print("Not a PFS0/NSP container (magic:", header[:4], ")")
+                  raise SystemExit(0)
+              count, strsize = struct.unpack_from("<II", header, 4)
+              entries = f.read(count * 0x18)
+              strings = f.read(strsize)
+              for i in range(count):
+                  off = struct.unpack_from("<I", entries, i * 0x18 + 0x10)[0]
+                  end = strings.find(b"\0", off)
+                  print(" ", strings[off:end].decode(errors="replace"))
+          PY
 
       - name: Update shader toolchain lock and header
         shell: bash
